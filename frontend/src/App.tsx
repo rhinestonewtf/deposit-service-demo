@@ -1,20 +1,14 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { DepositAddress } from './components/DepositAddress.tsx'
 import { DepositHistory } from './components/DepositHistory.tsx'
 import { DepositStatus } from './components/DepositStatus.tsx'
 import { useDeposits } from './hooks/useDeposits.ts'
 import { useSSE } from './hooks/useSSE.ts'
 import { tokenSymbol } from './lib/tokens.ts'
-import type {
-  AppConfig,
-  ChainInfo,
-  LiveStatus,
-  WebhookEvent,
-} from './types.ts'
+import type { AppConfig, ChainInfo, Deposit, LiveStatus } from './types.ts'
 
 export function App() {
   const [config, setConfig] = useState<AppConfig | null>(null)
-  const [status, setStatus] = useState<LiveStatus>({ kind: 'idle' })
   const { deposits, loading, refresh } = useDeposits()
 
   useEffect(() => {
@@ -24,32 +18,16 @@ export function App() {
       .catch((err) => console.error('failed to load config', err))
   }, [])
 
-  const onEvent = useCallback(
-    (event: WebhookEvent) => {
-      const now = event.time || new Date().toISOString()
-      switch (event.type) {
-        case 'deposit-received':
-          setStatus({ kind: 'received', at: now })
-          break
-        case 'bridge-started':
-          setStatus({ kind: 'bridging', at: now })
-          break
-        case 'bridge-complete':
-          setStatus({ kind: 'complete', at: now })
-          refresh()
-          break
-        case 'bridge-failed':
-          setStatus({ kind: 'failed', at: now })
-          refresh()
-          break
-        default:
-          break
-      }
-    },
-    [refresh],
-  )
+  // Webhooks fire per-deposit with no global ordering guarantee, so use them
+  // only as a refresh trigger and read live status from the newest deposit.
+  // This way two in-flight deposits can't regress the stepper by event order.
+  const onEvent = useCallback(() => {
+    refresh()
+  }, [refresh])
 
   useSSE(onEvent)
+
+  const status = useMemo(() => deriveStatus(deposits[0]), [deposits])
 
   return (
     <div className="min-h-screen bg-zinc-50 text-zinc-900">
@@ -90,6 +68,21 @@ export function App() {
       </footer>
     </div>
   )
+}
+
+function deriveStatus(deposit: Deposit | undefined): LiveStatus {
+  if (!deposit) return { kind: 'idle' }
+  const at = deposit.completedAt ?? deposit.createdAt
+  switch (deposit.status) {
+    case 'pending':
+      return { kind: 'received', at, txHash: deposit.txHash }
+    case 'processing':
+      return { kind: 'bridging', at, txHash: deposit.txHash }
+    case 'completed':
+      return { kind: 'complete', at, txHash: deposit.txHash }
+    case 'failed':
+      return { kind: 'failed', at }
+  }
 }
 
 function ConfigSummary({ config }: { config: AppConfig }) {

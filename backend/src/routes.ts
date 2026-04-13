@@ -66,6 +66,21 @@ export function createApp(state: State) {
       return c.json({ error: 'invalid json' }, 400)
     }
 
+    // Webhooks are scoped to the API key, not to this demo's deposit address.
+    // If the same key is reused elsewhere, drop events for other accounts so
+    // they don't drive this UI.
+    const account =
+      typeof event.data === 'object' &&
+      event.data !== null &&
+      'account' in event.data
+        ? String((event.data as { account: unknown }).account)
+        : undefined
+
+    if (account !== undefined && account !== state.depositAddress) {
+      console.log(`[webhook] ${event.type} (skipped — account ${account})`)
+      return c.json({ ok: true })
+    }
+
     console.log(`[webhook] ${event.type}`)
     broadcast(event)
     return c.json({ ok: true })
