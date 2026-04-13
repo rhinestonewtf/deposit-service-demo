@@ -1,0 +1,17 @@
+{
+  "name": "@demo/backend",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --env-file=../.env run --hot src/index.ts",
+    "start": "bun --env-file=../.env run src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "hono": "^4.6.0"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.6.0"
+  }
+}

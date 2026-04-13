@@ -1,0 +1,16 @@
+{
+  "name": "deposit-service-demo",
+  "private": true,
+  "type": "module",
+  "workspaces": ["backend", "frontend"],
+  "scripts": {
+    "dev": "concurrently -n backend,frontend -c blue,magenta \"cd backend && bun run dev\" \"cd frontend && bun run dev\"",
+    "dev:backend": "cd backend && bun run dev",
+    "dev:frontend": "cd frontend && bun run dev",
+    "build": "cd frontend && bun run build",
+    "typecheck": "cd backend && bun run typecheck && cd ../frontend && bun run typecheck"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}
